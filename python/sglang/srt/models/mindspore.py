@@ -11,6 +11,7 @@ from sglang.srt.distributed import (
     get_tensor_model_parallel_rank,
     get_tensor_model_parallel_world_size,
 )
+from sglang.srt.layers.dp_attention import is_dp_attention_enabled
 from sglang.srt.layers.logits_processor import LogitsProcessorOutput
 from sglang.srt.layers.quantization.base_config import QuantizationConfig
 from sglang.srt.model_executor.forward_batch_info import ForwardBatch
@@ -299,7 +300,23 @@ class MindSporeForCausalLM(torch.nn.Module):
         model_inputs["block_tables"] = block_tables
         # for speculative decode
         model_inputs["forward_mode"] = forward_batch.forward_mode
+        # for DP Attention
+        self.prepare_dp_attn_inputs(model_inputs, forward_batch)
         return model_inputs
+
+    def prepare_dp_attn_inputs(self, model_inputs, forward_batch: ForwardBatch):
+        if is_dp_attention_enabled():
+            model_inputs["global_num_tokens_gpu"] = tensor_torch2ms(forward_batch.global_num_tokens_gpu)
+            # In graph mode, the model cannot read external buffers. Need to pass the buffer as model input.
+            buffer_len = int(sum(forward_batch.global_num_tokens_gpu))
+            model_inputs["dp_buffer"] = ms.mint.zeros((buffer_len, self.config.hidden_size), dtype=self.config.param_dtype)
+            model_inputs["input_len"] = forward_batch.input_ids.shape[0]
+            model_inputs["is_max_len"] = forward_batch.dp_padding_mode.is_max_len()
+        else:
+            model_inputs["global_num_tokens_gpu"] = None
+            model_inputs["dp_buffer"] = None
+            model_inputs["input_len"] = None
+            model_inputs["is_max_len"] = None
 
     def forward(
         self,
