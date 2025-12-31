@@ -311,7 +311,7 @@ class MindSporeForCausalLM(torch.nn.Module):
         model_inputs = self.model.prepare_inputs(forward_batch, model_inputs)
 
         # Used by speculative decoding (EAGLE)
-        if self.model.capture_aux_hidden_states:
+        if hasattr(self.model, "capture_aux_hidden_states") and self.model.capture_aux_hidden_states:
             logits, hidden_states = self.model(**model_inputs)
         else:
             logits = self.model(**model_inputs)
