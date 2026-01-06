@@ -139,8 +139,8 @@ class LowerTriangularMask:
         query_lens_np: np.ndarray,
         seq_lens_np: np.ndarray,
     ):
-        max_query_len = query_lens_np.max()
-        max_seq_len = seq_lens_np.max()
+        max_query_len = query_lens_np.max() if query_lens_np.size > 0 else 0
+        max_seq_len = seq_lens_np.max() if seq_lens_np.size > 0 else 0
         if is_prefill:
             attention_mask = self.prefill_mask
         elif max_query_len > 1:
